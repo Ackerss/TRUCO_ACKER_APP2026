@@ -426,7 +426,11 @@ function changeScore(team, amount, speakPointText = null, ignoreMaoDeOnzeCheck =
                 }
             }
         };
-        if (amount > 0) {
+
+        if (winner) {
+            // Jogo acabou em 12 pontos, não precisa anunciar o embaralhador desta mão
+            advanceDealer(false, finalAction);
+        } else if (amount > 0) {
             advanceDealer(false, () => {
                 if (playerNames.length === gameMode && playerNames[currentDealerIndex]) {
                     speakText(`Embaralhador: ${playerNames[currentDealerIndex]}`, false, finalAction);
