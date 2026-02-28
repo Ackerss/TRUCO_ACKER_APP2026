@@ -505,17 +505,59 @@ function getPlayerNames(isModeChangeOrInitialSetup = false) {
     }
 }
 
+// Variável para o fluxo de seleção de equipes
+let currentTeamBeingEdited = null; // 'nos' ou 'eles'
+let teamNameSelectionCallback = null;
+
 function editTeamNames() {
     if (gameMode !== 4) return;
-    let newNameNos = prompt("Novo nome para a Equipe 1 (Nós):", teamNameNos);
-    if (newNameNos && newNameNos.trim()) teamNameNos = newNameNos.trim();
-    let newNameEles = prompt("Novo nome para a Equipe 2 (Eles):", teamNameEles);
-    if (newNameEles && newNameEles.trim()) teamNameEles = newNameEles.trim();
-    saveData(STORAGE_KEYS.TEAM_NAME_NOS, teamNameNos);
-    saveData(STORAGE_KEYS.TEAM_NAME_ELES, teamNameEles);
-    updateScoreSectionTitles();
-    speakText('equipes_atualizadas');
-    preloadPlayerNameAudios();
+    // Primeiro: escolhe nome da Equipe 1 (Nós)
+    openTeamNameModal('nos', () => {
+        // Depois: escolhe nome da Equipe 2 (Eles)
+        openTeamNameModal('eles', () => {
+            saveData(STORAGE_KEYS.TEAM_NAME_NOS, teamNameNos);
+            saveData(STORAGE_KEYS.TEAM_NAME_ELES, teamNameEles);
+            updateScoreSectionTitles();
+            speakText('equipes_atualizadas');
+            preloadPlayerNameAudios();
+        });
+    });
+}
+
+function openTeamNameModal(team, callback) {
+    currentTeamBeingEdited = team;
+    teamNameSelectionCallback = callback;
+    const modal = document.getElementById('teamNameModal');
+    const title = document.getElementById('teamModalTitle');
+    const grid = document.getElementById('teamNameGrid');
+    const customInput = document.getElementById('customTeamNameInput');
+
+    title.textContent = team === 'nos' ? 'Nome da Equipe 1 (Nós)' : 'Nome da Equipe 2 (Eles)';
+    customInput.value = '';
+
+    // Preenche o grid com os nomes engraçados
+    grid.innerHTML = '';
+    FUNNY_TEAM_NAMES.forEach(name => {
+        const btn = document.createElement('button');
+        btn.className = 'team-name-option';
+        btn.textContent = name;
+        btn.addEventListener('click', () => selectTeamName(name));
+        grid.appendChild(btn);
+    });
+
+    modal.classList.remove('hidden');
+}
+
+function selectTeamName(name) {
+    if (currentTeamBeingEdited === 'nos') {
+        teamNameNos = name;
+    } else {
+        teamNameEles = name;
+    }
+    document.getElementById('teamNameModal').classList.add('hidden');
+    if (teamNameSelectionCallback) {
+        setTimeout(teamNameSelectionCallback, 200);
+    }
 }
 
 // --- Lógica do Embaralhador ---
@@ -923,6 +965,13 @@ function addEventListeners() {
     closeRulesBtnBottom?.addEventListener('click', closeRules);
     rulesModal?.addEventListener('click', (e) => {
         if (e.target === rulesModal) closeRules();
+    });
+
+    // Botão de nome personalizado de equipe
+    document.getElementById('customTeamNameBtn')?.addEventListener('click', () => {
+        const input = document.getElementById('customTeamNameInput');
+        const name = input?.value?.trim();
+        if (name) selectTeamName(name);
     });
 
     document.querySelector('.teams').addEventListener('click', e => {

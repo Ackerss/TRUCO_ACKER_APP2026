@@ -1071,3 +1071,71 @@ hr {
 [data-theme="light"] .rules-scroll-area h3 {
     border-bottom-color: rgba(0, 0, 0, 0.1);
 }
+
+/* --- Seletor de Nomes de Equipes --- */
+.team-name-modal {
+    max-width: 450px;
+}
+
+.team-name-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.team-name-grid .team-name-option {
+    padding: 12px 8px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-color);
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.team-name-grid .team-name-option:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: scale(1.03);
+}
+
+.team-name-grid .team-name-option:active {
+    transform: scale(0.97);
+}
+
+.team-custom-input {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.team-custom-input input {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-color);
+    font-size: 1em;
+    font-family: 'Outfit', sans-serif;
+}
+
+.team-custom-input input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+[data-theme="light"] .team-name-grid .team-name-option {
+    border-color: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .team-custom-input input {
+    border-color: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.03);
+}

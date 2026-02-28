@@ -140,6 +140,27 @@
         </div>
     </div>
 
+    <!-- Modal de Seletor de Nome de Equipe -->
+    <div id="teamNameModal" class="modal-overlay hidden">
+        <div class="modal-content team-name-modal">
+            <button class="close-modal-btn"
+                onclick="document.getElementById('teamNameModal').classList.add('hidden')"><i
+                    class="fas fa-times"></i></button>
+            <div class="rules-scroll-area">
+                <h2 id="teamModalTitle">Escolha o Nome da Equipe</h2>
+                <div class="team-name-grid" id="teamNameGrid">
+                    <!-- Preenchido via JS -->
+                </div>
+                <div class="team-custom-input">
+                    <input type="text" id="customTeamNameInput" placeholder="Outro nome personalizado..."
+                        maxlength="25">
+                    <button id="customTeamNameBtn" class="close-rules-bottom" style="margin:8px 0;padding:10px">Usar
+                        Este Nome</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Regras -->
     <div id="rulesModal" class="modal-overlay hidden" aria-hidden="true">
         <div class="modal-content">
