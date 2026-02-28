@@ -618,6 +618,12 @@ function prepareNextGame(isModeChange = false) {
     isGameEffectivelyOver = false;
     toggleScoreControls(true);
 
+    // Restaura os botões ao estado normal (desfaz qualquer estado de Mão de 11 / Escurinha)
+    toggleScoreControlsSpecific('nos', 'normal');
+    toggleScoreControlsSpecific('eles', 'normal');
+    document.getElementById('decisao-nos')?.classList.add('hidden');
+    document.getElementById('decisao-eles')?.classList.add('hidden');
+
     if (undoButton) undoButton.disabled = true;
     updateCurrentGameDisplay(); resetCurrentTimerDisplay();
 
