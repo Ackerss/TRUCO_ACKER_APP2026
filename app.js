@@ -478,18 +478,21 @@ function checkMaoDeOnzeState() {
     } else if (isNosOnze) {
         // Mão de 11 para Nós
         let teamName = getTeamDisplayName('nos');
-        speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar ou correr.`);
-        toggleScoreControlsSpecific('nos', 'none'); // Oculta controles normais
-        document.getElementById('decisao-nos')?.classList.remove('hidden'); // Mostra dor
-        toggleScoreControlsSpecific('eles', 'none'); // Oculta controles do adversario também pra ngm pontuar sem querer
+        speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar as cartas e decidir se aceitam a partida por 3 pontos ou se vão correr!`);
+        toggleScoreControlsSpecific('nos', 'none');
+        document.getElementById('decisao-nos')?.classList.remove('hidden');
+        toggleScoreControlsSpecific('eles', 'none');
     } else if (isElesOnze) {
         // Mão de 11 para Eles
         let teamName = getTeamDisplayName('eles');
-        speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar ou correr.`);
+        speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar as cartas e decidir se aceitam a partida por 3 pontos ou se vão correr!`);
         toggleScoreControlsSpecific('eles', 'none');
         document.getElementById('decisao-eles')?.classList.remove('hidden');
         toggleScoreControlsSpecific('nos', 'none');
     }
+
+    // Mantém o botão Desfazer habilitado se houver estado anterior
+    if (undoButton && undoState) undoButton.disabled = false;
 }
 
 // Ativa/Trava botoes específicos de uma equipe
