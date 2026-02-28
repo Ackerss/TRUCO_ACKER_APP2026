@@ -223,9 +223,6 @@ function toggleScoreControls(enable) {
 
 // --- Sistema de Áudio MP3 (Voz Francisca) ---
 const AUDIO_BASE_PATH = 'audio/';
-// URL do Cloudflare Worker para geração dinâmica de nomes
-// IMPORTANTE: Substituir pela URL real do seu Worker após o deploy!
-const TTS_WORKER_URL = ''; // Ex: 'https://truco-tts.seu-usuario.workers.dev'
 
 // Cache de áudio em memória (Blob URLs)
 const audioCache = {};
@@ -279,10 +276,108 @@ function preloadStaticAudio() {
     });
 }
 
-// Gera áudio dinâmico para um nome via Cloudflare Worker
+// --- Edge-TTS no Browser via WebSocket ---
+const EDGE_TTS_TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+const EDGE_TTS_CHROMIUM_VER = '143.0.3650.75';
+const WINDOWS_FILE_TIME_EPOCH = 11644473600n;
+
+function escapeXml(text) {
+    return text.replace(/[<>&"']/g, c => {
+        switch (c) { case '<': return '&lt;'; case '>': return '&gt;'; case '&': return '&amp;'; case '"': return '&quot;'; case "'": return '&apos;'; default: return c; }
+    });
+}
+
+async function generateSecMsGecToken() {
+    const ticks = BigInt(Math.floor(Date.now() / 1000) + Number(WINDOWS_FILE_TIME_EPOCH)) * 10000000n;
+    const roundedTicks = ticks - (ticks % 3000000000n);
+    const strToHash = `${roundedTicks}${EDGE_TTS_TRUSTED_TOKEN}`;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(strToHash);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+function generateRequestId() {
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Gera áudio MP3 com a voz Francisca direto no browser via WebSocket
+async function edgeTtsGenerateInBrowser(text) {
+    const secToken = await generateSecMsGecToken();
+    const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EDGE_TTS_TRUSTED_TOKEN}&Sec-MS-GEC=${secToken}&Sec-MS-GEC-Version=1-${EDGE_TTS_CHROMIUM_VER}`;
+
+    return new Promise((resolve, reject) => {
+        const ws = new WebSocket(wsUrl);
+        const audioChunks = [];
+        let resolved = false;
+
+        ws.onopen = () => {
+            // Config
+            ws.send(`Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`);
+            // SSML
+            const reqId = generateRequestId();
+            ws.send(`X-RequestId:${reqId}\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="pt-BR"><voice name="pt-BR-FranciscaNeural"><prosody rate="default" pitch="default" volume="default">${escapeXml(text)}</prosody></voice></speak>`);
+        };
+
+        ws.onmessage = (event) => {
+            if (event.data instanceof Blob) {
+                // Dados binários = áudio
+                event.data.arrayBuffer().then(buf => {
+                    // Procura o separador "Path:audio\r\n" no binário
+                    const view = new Uint8Array(buf);
+                    const separator = new TextEncoder().encode('Path:audio\r\n');
+                    let sepIndex = -1;
+                    for (let i = 0; i <= view.length - separator.length; i++) {
+                        let match = true;
+                        for (let j = 0; j < separator.length; j++) {
+                            if (view[i + j] !== separator[j]) { match = false; break; }
+                        }
+                        if (match) { sepIndex = i + separator.length; break; }
+                    }
+                    if (sepIndex > 0) {
+                        audioChunks.push(view.slice(sepIndex));
+                    }
+                });
+            } else if (typeof event.data === 'string') {
+                if (event.data.includes('Path:turn.end')) {
+                    ws.close();
+                }
+            }
+        };
+
+        ws.onclose = () => {
+            if (resolved) return;
+            resolved = true;
+            if (audioChunks.length > 0) {
+                const totalLen = audioChunks.reduce((a, c) => a + c.length, 0);
+                const merged = new Uint8Array(totalLen);
+                let offset = 0;
+                for (const chunk of audioChunks) { merged.set(chunk, offset); offset += chunk.length; }
+                const blob = new Blob([merged], { type: 'audio/mpeg' });
+                resolve(blob);
+            } else {
+                reject(new Error('Nenhum áudio recebido'));
+            }
+        };
+
+        ws.onerror = (err) => {
+            if (!resolved) { resolved = true; reject(new Error('Erro no WebSocket TTS')); }
+        };
+
+        // Timeout de 10s
+        setTimeout(() => {
+            if (!resolved) { resolved = true; ws.close(); reject(new Error('Timeout TTS')); }
+        }, 10000);
+    });
+}
+
+// Gera áudio dinâmico para um nome usando edge-tts direto no browser
 async function generateDynamicNameAudio(name) {
     const cacheKey = `name_${name.toLowerCase().trim()}`;
-    if (audioCache[cacheKey]) return cacheKey; // Já cacheado
+    if (audioCache[cacheKey]) return cacheKey; // Já cacheado na memória
 
     // Verifica se tem no mapa estático
     const staticKey = STATIC_NAME_MAP[name.toLowerCase().trim()];
@@ -298,13 +393,10 @@ async function generateDynamicNameAudio(name) {
         }
     } catch (e) { /* Ignora */ }
 
-    // Se não tem Worker configurado, retorna null (usar fallback)
-    if (!TTS_WORKER_URL) return null;
-
+    // Gera com edge-tts direto no browser!
     try {
-        const response = await fetch(`${TTS_WORKER_URL}/?text=${encodeURIComponent(name)}`);
-        if (!response.ok) return null;
-        const blob = await response.blob();
+        console.log(`🎙️ Gerando áudio Francisca para: "${name}"`);
+        const blob = await edgeTtsGenerateInBrowser(name);
         const dataUrl = await new Promise(resolve => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result);
@@ -314,6 +406,7 @@ async function generateDynamicNameAudio(name) {
         try { localStorage.setItem(`tts_cache_${cacheKey}`, dataUrl); } catch (e) { /* Ignora */ }
         const audio = new Audio(dataUrl);
         audioCache[cacheKey] = audio;
+        console.log(`✅ Áudio gerado e cacheado para: "${name}"`);
         return cacheKey;
     } catch (e) {
         console.warn('Falha ao gerar áudio dinâmico para:', name, e);
