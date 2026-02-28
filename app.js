@@ -114,9 +114,31 @@ function updateMainTitle() {
 function updateFooterCredit() {
     if (footerTextElement) footerTextElement.textContent = "Desenvolvido por Jacson A Duarte";
 }
-function updateCurrentGameDisplay() {
-    if (scoreNosElement) scoreNosElement.textContent = scoreNos;
-    if (scoreElesElement) scoreElesElement.textContent = scoreEles;
+function updateCurrentGameDisplay(teamScored = null, isTruco = false) {
+    if (scoreNosElement) {
+        scoreNosElement.textContent = scoreNos;
+        if (teamScored === 'nos') {
+            scoreNosElement.classList.remove('score-animate');
+            void scoreNosElement.offsetWidth;
+            scoreNosElement.classList.add('score-animate');
+            if (isTruco) {
+                const teamEl = scoreNosElement.closest('.team');
+                if (teamEl) { teamEl.classList.remove('flash-animate-nos'); void teamEl.offsetWidth; teamEl.classList.add('flash-animate-nos'); }
+            }
+        }
+    }
+    if (scoreElesElement) {
+        scoreElesElement.textContent = scoreEles;
+        if (teamScored === 'eles') {
+            scoreElesElement.classList.remove('score-animate');
+            void scoreElesElement.offsetWidth;
+            scoreElesElement.classList.add('score-animate');
+            if (isTruco) {
+                const teamEl = scoreElesElement.closest('.team');
+                if (teamEl) { teamEl.classList.remove('flash-animate-eles'); void teamEl.offsetWidth; teamEl.classList.add('flash-animate-eles'); }
+            }
+        }
+    }
     if (prevScoreNosElement) prevScoreNosElement.textContent = isInitialState ? '-' : prevScoreNos;
     if (prevScoreElesElement) prevScoreElesElement.textContent = isInitialState ? '-' : prevScoreEles;
 }
@@ -243,12 +265,26 @@ function stopTimer() {
 }
 function resetCurrentTimerDisplay() { stopTimer(); if (currentTimerElement) currentTimerElement.textContent = formatTime(0); }
 
-// --- Wake Lock API ---
+// --- Wake Lock API e Audio Unlock ---
 async function requestWakeLock() {
     if ('wakeLock' in navigator) try { if (!wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => wakeLock = null); } } catch (e) { wakeLock = null; }
 }
 async function releaseWakeLock() { if (wakeLock) try { await wakeLock.release(); } catch (e) { /*Ignora*/ } finally { wakeLock = null; } }
 document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && gameStartTime) await requestWakeLock(); });
+
+let isSpeechUnlocked = false;
+document.addEventListener('click', async () => {
+    // 1. Desbloqueia a fala no primeiro toque na tela (para iOS/Android restritivos)
+    if (!isSpeechUnlocked && isSoundOn && ('speechSynthesis' in window)) {
+        let u = new SpeechSynthesisUtterance(''); u.volume = 0;
+        window.speechSynthesis.speak(u);
+        isSpeechUnlocked = true;
+    }
+    // 2. Tenta reativar a tela sempre que o jogador interagir com o app
+    if (gameStartTime && !wakeLock && ('wakeLock' in navigator)) {
+        await requestWakeLock();
+    }
+});
 
 // --- Gerenciamento de Nomes ---
 function getPlayerNames(isModeChangeOrInitialSetup = false) {
@@ -275,7 +311,7 @@ function getPlayerNames(isModeChangeOrInitialSetup = false) {
                 }
             } else {
                 playerNames = oldPlayerNames;
-                 if (!(isModeChangeOrInitialSetup && playerNames.length === numPlayersToDefine && playerNames.every(name => name.startsWith("Jogador ")))) {
+                if (!(isModeChangeOrInitialSetup && playerNames.length === numPlayersToDefine && playerNames.every(name => name.startsWith("Jogador ")))) {
                     alert("Edição cancelada. Nomes anteriores mantidos.");
                 }
             }
@@ -292,7 +328,7 @@ function getPlayerNames(isModeChangeOrInitialSetup = false) {
     updateDealerDisplay();
 
     // Só fala se não for a inicialização silenciosa da voz
-     if (!(isModeChangeOrInitialSetup && playerNames.length === numPlayersToDefine && playerNames.every(name => name.startsWith("Jogador ")))) {
+    if (!(isModeChangeOrInitialSetup && playerNames.length === numPlayersToDefine && playerNames.every(name => name.startsWith("Jogador ")))) {
         speakText(isModeChangeOrInitialSetup ? `Modo de ${gameMode} jogadores configurado. ${playerNames[currentDealerIndex] || `Jogador ${currentDealerIndex + 1}`} embaralha.` : "Nomes dos jogadores atualizados.");
     }
 
@@ -352,9 +388,9 @@ function changeScore(team, amount, speakPointText = null) {
     if ((amount > 0 && currentTargetScore >= maxScore) ||
         (amount < 0 && currentTargetScore <= 0 && amount !== -currentTargetScore) ||
         (amount < 0 && (currentTargetScore + amount) < 0)
-       ) {
+    ) {
         if (!(amount > 0 && currentTargetScore >= maxScore)) {
-             return false;
+            return false;
         }
     }
 
@@ -376,7 +412,7 @@ function changeScore(team, amount, speakPointText = null) {
         scoreEles = Math.min(maxScore, Math.max(0, scoreEles + amount));
         if (scoreEles >= maxScore) winner = 'eles';
     }
-    updateCurrentGameDisplay();
+    updateCurrentGameDisplay(amount > 0 ? team : null, amount >= 3);
 
     if (winner) {
         isGameEffectivelyOver = true;
@@ -427,7 +463,7 @@ function undoLastAction() {
         scoreNos = undoState.sN; scoreEles = undoState.sE;
         prevScoreNos = undoState.psN; prevScoreEles = undoState.psE;
         isInitialState = undoState.isI; currentDealerIndex = undoState.dI;
-        
+
         isGameEffectivelyOver = undoState.wasOver;
         if (scoreNos < maxScore && scoreEles < maxScore) {
             isGameEffectivelyOver = false;
@@ -474,7 +510,7 @@ function processMatchEnd(winnerTeam) {
         const p1Display = gameMode === 4 ? teamNameNos : (playerNames[0] || "J1");
         const p2Display = gameMode === 4 ? teamNameEles : (playerNames[1] || "J2");
         alertMsg += `${p1Display}: ${matchesWonNos}\n${p2Display}: ${matchesWonEles}`;
-        
+
         alert(alertMsg);
         updateMatchWinsDisplay();
         prepareNextGame(); // AUTOMATICAMENTE PREPARA A PRÓXIMA PARTIDA APÓS O ALERT
@@ -507,7 +543,7 @@ function prepareNextGame(isModeChange = false) {
         if (playerNames.length === gameMode && playerNames.every(name => name && name.trim() !== "")) {
             setTimeout(startTimer, 150);
         } else if (playerNames.length === gameMode) {
-             setTimeout(startTimer, 150);
+            setTimeout(startTimer, 150);
         }
     }
 }
