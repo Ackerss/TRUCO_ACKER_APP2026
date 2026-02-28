@@ -255,7 +255,7 @@ const FUNNY_TEAM_NAMES = [
 // Pré-carregar MP3 estáticos na memória
 function preloadStaticAudio() {
     const staticFiles = [
-        'truco', 'seis', 'nove', 'doze', 'para',
+        'truco', 'seis', 'nove', 'doze', 'para', 'um_ponto',
         'mao_de_11', 'decidir_mao_11', 'escurinha', 'jogo_aceito', 'correu',
         'acao_desfeita', 'nada_desfazer', 'jogo_reiniciado', 'placar_zerado',
         'som_ativado', 'nomes_atualizados', 'equipes_atualizadas',
@@ -572,7 +572,13 @@ function advanceDealer(speakAnnounce = false, callback = null) {
     updateDealerDisplay();
     if (speakAnnounce && playerNames[currentDealerIndex]) {
         const nameKey = getNameAudioKey(playerNames[currentDealerIndex]);
-        speakText(['proximo_embaralhar', nameKey].filter(Boolean), true, callback);
+        if (nameKey) {
+            speakText(['proximo_embaralhar', nameKey].filter(Boolean), true, callback);
+        } else {
+            playAudioSequence(['proximo_embaralhar'], () => {
+                speakFallback(playerNames[currentDealerIndex], callback);
+            });
+        }
     } else if (callback) {
         callback();
     }
@@ -646,17 +652,31 @@ function changeScore(team, amount, speakPointText = null, ignoreMaoDeOnzeCheck =
             advanceDealer(false, () => {
                 if (playerNames.length === gameMode && playerNames[currentDealerIndex]) {
                     const nameKey = getNameAudioKey(playerNames[currentDealerIndex]);
-                    speakText(['embaralhador', nameKey].filter(Boolean), false, finalAction);
+                    if (nameKey) {
+                        speakText(['embaralhador', nameKey].filter(Boolean), false, finalAction);
+                    } else {
+                        playAudioSequence(['embaralhador'], () => {
+                            speakFallback(playerNames[currentDealerIndex], finalAction);
+                        });
+                    }
                 } else { finalAction(); }
             });
         } else { finalAction(); }
     };
 
     if (speakPointText && amount !== 0) {
-        const pointKey = speakPointText.toLowerCase();
+        // Converte 'um ponto' -> 'um_ponto', 'Truco' -> 'truco', etc.
+        const pointKey = speakPointText.toLowerCase().replace(/\s+/g, '_');
         let targetName = getTeamDisplayName(team);
         const nameKey = getNameAudioKey(targetName);
-        speakText([pointKey, 'para', nameKey].filter(Boolean), true, afterPointSpeechAction);
+        if (nameKey) {
+            speakText([pointKey, 'para', nameKey].filter(Boolean), true, afterPointSpeechAction);
+        } else {
+            // Nome não tem MP3, usa MP3 de pontuação + fallback de voz para o nome
+            playAudioSequence([pointKey, 'para'].filter(k => k && audioCache[k]), () => {
+                speakFallback(targetName, afterPointSpeechAction);
+            });
+        }
     } else {
         afterPointSpeechAction();
     }
@@ -690,14 +710,26 @@ function checkMaoDeOnzeState() {
     } else if (isNosOnze) {
         let teamName = getTeamDisplayName('nos');
         const nameKey = getNameAudioKey(teamName);
-        speakText(['mao_de_11', nameKey, 'decidir_mao_11'].filter(Boolean));
+        if (nameKey) {
+            speakText(['mao_de_11', nameKey, 'decidir_mao_11'].filter(Boolean));
+        } else {
+            playAudioSequence(['mao_de_11'], () => {
+                speakFallback(teamName, () => { playAudioSequence(['decidir_mao_11']); });
+            });
+        }
         toggleScoreControlsSpecific('nos', 'none');
         document.getElementById('decisao-nos')?.classList.remove('hidden');
         toggleScoreControlsSpecific('eles', 'none');
     } else if (isElesOnze) {
         let teamName = getTeamDisplayName('eles');
         const nameKey = getNameAudioKey(teamName);
-        speakText(['mao_de_11', nameKey, 'decidir_mao_11'].filter(Boolean));
+        if (nameKey) {
+            speakText(['mao_de_11', nameKey, 'decidir_mao_11'].filter(Boolean));
+        } else {
+            playAudioSequence(['mao_de_11'], () => {
+                speakFallback(teamName, () => { playAudioSequence(['decidir_mao_11']); });
+            });
+        }
         toggleScoreControlsSpecific('eles', 'none');
         document.getElementById('decisao-eles')?.classList.remove('hidden');
         toggleScoreControlsSpecific('nos', 'none');
@@ -825,7 +857,13 @@ function processMatchEnd(winnerTeam) {
         saveData(STORAGE_KEYS.MATCHES_ELES, matchesWonEles);
         const nameKey = getNameAudioKey(winnerNameDisplay);
         const victoryKey = gameMode === 4 ? 'ganharam_partida' : 'ganhou_partida';
-        speakText([nameKey, victoryKey].filter(Boolean), true, speechAndAlertCallback);
+        if (nameKey) {
+            speakText([nameKey, victoryKey].filter(Boolean), true, speechAndAlertCallback);
+        } else {
+            speakFallback(winnerNameDisplay, () => {
+                playAudioSequence([victoryKey], speechAndAlertCallback);
+            });
+        }
     }, 300);
 }
 
