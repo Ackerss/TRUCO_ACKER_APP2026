@@ -221,26 +221,186 @@ function toggleScoreControls(enable) {
     });
 }
 
-// --- Síntese de Voz ---
-function speakText(text, cancelPrevious = true, callback = null) {
-    if (!isSoundOn || !('speechSynthesis' in window)) {
-        if (callback) callback(); return;
-    }
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'pt-BR'; utterance.rate = 1.0; utterance.pitch = 1.0;
-    if (callback) {
-        utterance.onend = callback;
-        utterance.onerror = () => { console.warn("Erro na síntese de voz."); if (callback) callback(); };
-    }
-    if (cancelPrevious && window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
-        setTimeout(() => window.speechSynthesis.speak(utterance), 50);
-    } else {
-        window.speechSynthesis.speak(utterance);
+// --- Sistema de Áudio MP3 (Voz Francisca) ---
+const AUDIO_BASE_PATH = 'audio/';
+// URL do Cloudflare Worker para geração dinâmica de nomes
+// IMPORTANTE: Substituir pela URL real do seu Worker após o deploy!
+const TTS_WORKER_URL = ''; // Ex: 'https://truco-tts.seu-usuario.workers.dev'
+
+// Cache de áudio em memória (Blob URLs)
+const audioCache = {};
+
+// Mapa de nomes de jogadores/equipes padrão para seus arquivos MP3 estáticos
+const STATIC_NAME_MAP = {
+    'jogador 1': 'jogador_1', 'jogador 2': 'jogador_2',
+    'jogador 3': 'jogador_3', 'jogador 4': 'jogador_4',
+    'nós': 'equipe_nos', 'eles': 'equipe_eles',
+    'os pato': 'equipe_os_pato', 'os marreco': 'equipe_os_marreco',
+    'os freguês': 'equipe_os_freegues', 'os mão de alface': 'equipe_os_mao_de_alface',
+    'os boca aberta': 'equipe_os_boca_aberta', 'os treme-treme': 'equipe_os_treme_treme',
+    'os pé de cana': 'equipe_os_pe_de_cana', 'os copo furado': 'equipe_os_copo_furado',
+    'os garganta': 'equipe_os_garganta', 'as patroa': 'equipe_as_patroa',
+    'os cunhado': 'equipe_os_cunhado', 'os manja rola': 'equipe_os_manja_rola',
+    'os queima rosca': 'equipe_os_queima_rosca'
+};
+
+// Lista de nomes engraçados de equipes para o seletor
+const FUNNY_TEAM_NAMES = [
+    'Nós', 'Eles', 'Os Pato', 'Os Marreco', 'Os Freguês',
+    'Os Mão de Alface', 'Os Boca Aberta', 'Os Treme-Treme',
+    'Os Pé de Cana', 'Os Copo Furado', 'Os Garganta',
+    'As Patroa', 'Os Cunhado', 'Os Manja Rola', 'Os Queima Rosca'
+];
+
+// Pré-carregar MP3 estáticos na memória
+function preloadStaticAudio() {
+    const staticFiles = [
+        'truco', 'seis', 'nove', 'doze', 'para',
+        'mao_de_11', 'decidir_mao_11', 'escurinha', 'jogo_aceito', 'correu',
+        'acao_desfeita', 'nada_desfazer', 'jogo_reiniciado', 'placar_zerado',
+        'som_ativado', 'nomes_atualizados', 'equipes_atualizadas',
+        'nao_desfazer_modo', 'historico_pronto',
+        'embaralhador', 'embaralha', 'proximo_embaralhar',
+        'ganhou_partida', 'ganharam_partida',
+        'modo_2_config', 'modo_4_config', 'modo_alterado_2', 'modo_alterado_4',
+        'jogador_1', 'jogador_2', 'jogador_3', 'jogador_4',
+        'equipe_nos', 'equipe_eles',
+        'equipe_os_pato', 'equipe_os_marreco', 'equipe_os_freegues',
+        'equipe_os_mao_de_alface', 'equipe_os_boca_aberta', 'equipe_os_treme_treme',
+        'equipe_os_pe_de_cana', 'equipe_os_copo_furado', 'equipe_os_garganta',
+        'equipe_as_patroa', 'equipe_os_cunhado', 'equipe_os_manja_rola',
+        'equipe_os_queima_rosca'
+    ];
+    staticFiles.forEach(name => {
+        const audio = new Audio();
+        audio.preload = 'auto';
+        audio.src = `${AUDIO_BASE_PATH}${name}.mp3`;
+        audioCache[name] = audio;
+    });
+}
+
+// Gera áudio dinâmico para um nome via Cloudflare Worker
+async function generateDynamicNameAudio(name) {
+    const cacheKey = `name_${name.toLowerCase().trim()}`;
+    if (audioCache[cacheKey]) return cacheKey; // Já cacheado
+
+    // Verifica se tem no mapa estático
+    const staticKey = STATIC_NAME_MAP[name.toLowerCase().trim()];
+    if (staticKey && audioCache[staticKey]) return staticKey;
+
+    // Verifica no localStorage (cache persistente)
+    try {
+        const cached = localStorage.getItem(`tts_cache_${cacheKey}`);
+        if (cached) {
+            const audio = new Audio(cached); // data: URL
+            audioCache[cacheKey] = audio;
+            return cacheKey;
+        }
+    } catch (e) { /* Ignora */ }
+
+    // Se não tem Worker configurado, retorna null (usar fallback)
+    if (!TTS_WORKER_URL) return null;
+
+    try {
+        const response = await fetch(`${TTS_WORKER_URL}/?text=${encodeURIComponent(name)}`);
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        const dataUrl = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+        });
+        // Salva no localStorage para cache persistente
+        try { localStorage.setItem(`tts_cache_${cacheKey}`, dataUrl); } catch (e) { /* Ignora */ }
+        const audio = new Audio(dataUrl);
+        audioCache[cacheKey] = audio;
+        return cacheKey;
+    } catch (e) {
+        console.warn('Falha ao gerar áudio dinâmico para:', name, e);
+        return null;
     }
 }
 
-// --- Cronômetro ---
+// Pré-gera áudio para todos os nomes atuais de jogadores/equipes
+async function preloadPlayerNameAudios() {
+    const namestoPreload = [...playerNames];
+    if (gameMode === 4) {
+        namestoPreload.push(teamNameNos, teamNameEles);
+    }
+    for (const name of namestoPreload) {
+        if (name && name.trim()) {
+            await generateDynamicNameAudio(name);
+        }
+    }
+}
+
+// Resolve o áudio key para um nome (estático ou dinâmico)
+function getNameAudioKey(name) {
+    if (!name) return null;
+    const lower = name.toLowerCase().trim();
+    const staticKey = STATIC_NAME_MAP[lower];
+    if (staticKey && audioCache[staticKey]) return staticKey;
+    const dynamicKey = `name_${lower}`;
+    if (audioCache[dynamicKey]) return dynamicKey;
+    return null;
+}
+
+// Toca uma sequência de áudios MP3
+let currentAudioPlaying = null;
+function playAudioSequence(keys, callback = null) {
+    if (!isSoundOn) { if (callback) callback(); return; }
+
+    // Cancela áudio anterior
+    if (currentAudioPlaying) {
+        currentAudioPlaying.pause();
+        currentAudioPlaying.currentTime = 0;
+        currentAudioPlaying = null;
+    }
+
+    const validKeys = keys.filter(k => k && audioCache[k]);
+    if (validKeys.length === 0) {
+        if (callback) callback();
+        return;
+    }
+
+    let index = 0;
+    function playNext() {
+        if (index >= validKeys.length) {
+            currentAudioPlaying = null;
+            if (callback) callback();
+            return;
+        }
+        const key = validKeys[index];
+        const cached = audioCache[key];
+        // Clonar para poder tocar o mesmo áudio sem conflito
+        const audio = cached.cloneNode ? cached.cloneNode() : new Audio(cached.src);
+        currentAudioPlaying = audio;
+        audio.onended = () => { index++; playNext(); };
+        audio.onerror = () => { console.warn('Erro no áudio:', key); index++; playNext(); };
+        audio.play().catch(() => { index++; playNext(); });
+    }
+    playNext();
+}
+
+// Função wrapper que substitui o antigo speakText
+// Aceita: uma string com o ID do MP3, ou um array de IDs para tocar em sequência
+function speakText(audioKeyOrKeys, cancelPrevious = true, callback = null) {
+    if (!isSoundOn) { if (callback) callback(); return; }
+    const keys = Array.isArray(audioKeyOrKeys) ? audioKeyOrKeys : [audioKeyOrKeys];
+    playAudioSequence(keys, callback);
+}
+
+// Fallback: fala com voz do navegador se não tiver MP3
+function speakFallback(text, callback = null) {
+    if (!isSoundOn || !('speechSynthesis' in window)) { if (callback) callback(); return; }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'pt-BR'; utterance.rate = 1.0;
+    if (callback) { utterance.onend = callback; utterance.onerror = () => { if (callback) callback(); }; }
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        setTimeout(() => window.speechSynthesis.speak(utterance), 50);
+    } else { window.speechSynthesis.speak(utterance); }
+}
 function formatTime(ms) {
     if (ms === null || ms < 0) return "--:--";
     let s = Math.floor(ms / 1000), h = Math.floor(s / 3600);
@@ -270,15 +430,16 @@ async function requestWakeLock() {
 async function releaseWakeLock() { if (wakeLock) try { await wakeLock.release(); } catch (e) { /*Ignora*/ } finally { wakeLock = null; } }
 document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && gameStartTime) await requestWakeLock(); });
 
-let isSpeechUnlocked = false;
+let isAudioUnlocked = false;
 document.addEventListener('click', async () => {
-    // 1. Desbloqueia a fala no primeiro toque na tela (para iOS/Android restritivos)
-    if (!isSpeechUnlocked && isSoundOn && ('speechSynthesis' in window)) {
-        let u = new SpeechSynthesisUtterance(''); u.volume = 0;
-        window.speechSynthesis.speak(u);
-        isSpeechUnlocked = true;
+    if (!isAudioUnlocked && isSoundOn) {
+        try {
+            const silentAudio = new Audio();
+            silentAudio.volume = 0;
+            await silentAudio.play().catch(() => { });
+            isAudioUnlocked = true;
+        } catch (e) { /* Ignora */ }
     }
-    // 2. Tenta reativar a tela sempre que o jogador interagir com o app
     if (gameStartTime && !wakeLock && ('wakeLock' in navigator)) {
         await requestWakeLock();
     }
@@ -327,8 +488,16 @@ function getPlayerNames(isModeChangeOrInitialSetup = false) {
 
     // Só fala se não for a inicialização silenciosa da voz
     if (!(isModeChangeOrInitialSetup && playerNames.length === numPlayersToDefine && playerNames.every(name => name.startsWith("Jogador ")))) {
-        speakText(isModeChangeOrInitialSetup ? `Modo de ${gameMode} jogadores configurado. ${playerNames[currentDealerIndex] || `Jogador ${currentDealerIndex + 1}`} embaralha.` : "Nomes dos jogadores atualizados.");
+        if (isModeChangeOrInitialSetup) {
+            const modeKey = gameMode === 2 ? 'modo_2_config' : 'modo_4_config';
+            const dealerKey = getNameAudioKey(playerNames[currentDealerIndex]);
+            speakText([modeKey, dealerKey, 'embaralha'].filter(Boolean), true);
+        } else {
+            speakText('nomes_atualizados');
+        }
     }
+    // Pré-carrega áudio dos nomes digitados
+    preloadPlayerNameAudios();
 
 
     if (isModeChangeOrInitialSetup && !gameStartTime && playerNames.length === numPlayersToDefine) {
@@ -345,7 +514,8 @@ function editTeamNames() {
     saveData(STORAGE_KEYS.TEAM_NAME_NOS, teamNameNos);
     saveData(STORAGE_KEYS.TEAM_NAME_ELES, teamNameEles);
     updateScoreSectionTitles();
-    speakText("Nomes das equipes atualizados.");
+    speakText('equipes_atualizadas');
+    preloadPlayerNameAudios();
 }
 
 // --- Lógica do Embaralhador ---
@@ -359,7 +529,8 @@ function advanceDealer(speakAnnounce = false, callback = null) {
     saveData(STORAGE_KEYS.DEALER_INDEX, currentDealerIndex);
     updateDealerDisplay();
     if (speakAnnounce && playerNames[currentDealerIndex]) {
-        speakText(`Próximo a embaralhar: ${playerNames[currentDealerIndex]}`, true, callback);
+        const nameKey = getNameAudioKey(playerNames[currentDealerIndex]);
+        speakText(['proximo_embaralhar', nameKey].filter(Boolean), true, callback);
     } else if (callback) {
         callback();
     }
@@ -428,22 +599,22 @@ function changeScore(team, amount, speakPointText = null, ignoreMaoDeOnzeCheck =
         };
 
         if (winner) {
-            // Jogo acabou em 12 pontos, não precisa anunciar o embaralhador desta mão
             advanceDealer(false, finalAction);
         } else if (amount > 0) {
             advanceDealer(false, () => {
                 if (playerNames.length === gameMode && playerNames[currentDealerIndex]) {
-                    speakText(`Embaralhador: ${playerNames[currentDealerIndex]}`, false, finalAction);
+                    const nameKey = getNameAudioKey(playerNames[currentDealerIndex]);
+                    speakText(['embaralhador', nameKey].filter(Boolean), false, finalAction);
                 } else { finalAction(); }
             });
         } else { finalAction(); }
     };
 
     if (speakPointText && amount !== 0) {
-        let fullSpeakText = speakPointText;
+        const pointKey = speakPointText.toLowerCase();
         let targetName = getTeamDisplayName(team);
-        fullSpeakText += ` para ${targetName}`;
-        speakText(fullSpeakText, true, afterPointSpeechAction);
+        const nameKey = getNameAudioKey(targetName);
+        speakText([pointKey, 'para', nameKey].filter(Boolean), true, afterPointSpeechAction);
     } else {
         afterPointSpeechAction();
     }
@@ -471,21 +642,20 @@ function checkMaoDeOnzeState() {
     toggleScoreControlsSpecific('eles', 'normal');
 
     if (isNosOnze && isElesOnze) {
-        // Escurinha (11 a 11)
-        speakText("Escurinha! Jogo no escuro, não vale pedir truco.");
+        speakText('escurinha');
         toggleScoreControlsSpecific('nos', 'escurinha');
         toggleScoreControlsSpecific('eles', 'escurinha');
     } else if (isNosOnze) {
-        // Mão de 11 para Nós
         let teamName = getTeamDisplayName('nos');
-        speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar as cartas e decidir se aceitam a partida por 3 pontos ou se vão correr!`);
+        const nameKey = getNameAudioKey(teamName);
+        speakText(['mao_de_11', nameKey, 'decidir_mao_11'].filter(Boolean));
         toggleScoreControlsSpecific('nos', 'none');
         document.getElementById('decisao-nos')?.classList.remove('hidden');
         toggleScoreControlsSpecific('eles', 'none');
     } else if (isElesOnze) {
-        // Mão de 11 para Eles
         let teamName = getTeamDisplayName('eles');
-        speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar as cartas e decidir se aceitam a partida por 3 pontos ou se vão correr!`);
+        const nameKey = getNameAudioKey(teamName);
+        speakText(['mao_de_11', nameKey, 'decidir_mao_11'].filter(Boolean));
         toggleScoreControlsSpecific('eles', 'none');
         document.getElementById('decisao-eles')?.classList.remove('hidden');
         toggleScoreControlsSpecific('nos', 'none');
@@ -544,7 +714,7 @@ function undoLastAction() {
     if (undoState) {
         if (undoState.mde !== undefined && undoState.mde !== gameMode) {
             alert("Não é possível desfazer após trocar o modo de jogo.");
-            speakText("Não é possível desfazer após trocar o modo de jogo.", true);
+            speakText('nao_desfazer_modo', true);
             undoState = null; if (undoButton) undoButton.disabled = true; return;
         }
         scoreNos = undoState.sN; scoreEles = undoState.sE;
@@ -568,9 +738,9 @@ function undoLastAction() {
         checkMaoDeOnzeState();
 
         undoState = null; if (undoButton) undoButton.disabled = true;
-        speakText("Ação desfeita.", true);
+        speakText('acao_desfeita', true);
     } else {
-        speakText("Nada para desfazer.", true); if (undoButton) undoButton.disabled = true;
+        speakText('nada_desfazer', true); if (undoButton) undoButton.disabled = true;
     }
 }
 
@@ -611,7 +781,9 @@ function processMatchEnd(winnerTeam) {
         if (winnerTeam === 'nos') matchesWonNos++; else matchesWonEles++;
         saveData(STORAGE_KEYS.MATCHES_NOS, matchesWonNos);
         saveData(STORAGE_KEYS.MATCHES_ELES, matchesWonEles);
-        speakText(`${winnerNameDisplay} ${winningTerm} a partida!`, true, speechAndAlertCallback);
+        const nameKey = getNameAudioKey(winnerNameDisplay);
+        const victoryKey = gameMode === 4 ? 'ganharam_partida' : 'ganhou_partida';
+        speakText([nameKey, victoryKey].filter(Boolean), true, speechAndAlertCallback);
     }, 300);
 }
 
@@ -649,7 +821,7 @@ function prepareNextGame(isModeChange = false) {
 function resetCurrentGame(isModeChange = false) {
     if (isModeChange || confirm("Tem certeza que deseja reiniciar apenas o jogo atual (placar de 0 a 12)?")) {
         prepareNextGame(isModeChange);
-        if (!isModeChange) speakText("Jogo atual reiniciado.");
+        if (!isModeChange) speakText('jogo_reiniciado');
     }
 }
 
@@ -662,7 +834,7 @@ function resetAllScores() {
         updateMatchWinsDisplay(); updateScoreSectionTitles(); updateDealerDisplay();
         updateDurationHistoryDisplay();
         prepareNextGame(true);
-        speakText("Placar geral zerado. Configure os nomes.");
+        speakText('placar_zerado');
     }
 }
 
@@ -676,7 +848,7 @@ function setTheme(themeName) {
 }
 function toggleTheme() { setTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
 function setSound(soundOn) { isSoundOn = soundOn; saveData(STORAGE_KEYS.SOUND_ON, isSoundOn); updateSoundButtonIcon(); }
-function toggleSound() { setSound(!isSoundOn); if (isSoundOn) speakText("Som ativado.", true); else if (window.speechSynthesis) window.speechSynthesis.cancel(); }
+function toggleSound() { setSound(!isSoundOn); if (isSoundOn) speakText('som_ativado', true); }
 
 // --- Funcionalidades Adicionais ---
 function toggleGameMode() {
@@ -685,7 +857,8 @@ function toggleGameMode() {
         saveGameMode();
         updateUIBasedOnMode();
         resetCurrentGame(true);
-        speakText(`Modo alterado para ${gameMode} jogadores. Configure os nomes.`, true);
+        const modeKey = gameMode === 2 ? 'modo_alterado_2' : 'modo_alterado_4';
+        speakText(modeKey, true);
     }
 }
 
@@ -731,7 +904,7 @@ function exportHistoryToWhatsApp() {
     historyText += `\nEmbaralhador Atual: ${dealerNameElement.textContent}`;
 
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(historyText)}`, '_blank');
-    speakText("Histórico pronto para compartilhar.", true);
+    speakText('historico_pronto', true);
 }
 
 // --- Event Listeners ---
@@ -764,7 +937,7 @@ function addEventListeners() {
             toggleScoreControlsSpecific('nos', 'aceitou11');
             toggleScoreControlsSpecific('eles', 'aceitou11');
 
-            speakText("Jogo aceito! Valendo 3 pontos!");
+            speakText('jogo_aceito');
         }
         if (btn?.classList.contains('btn-recusar')) {
             const teamInfo = btn.dataset.team;
@@ -775,7 +948,7 @@ function addEventListeners() {
             toggleScoreControlsSpecific('nos', 'normal');
             toggleScoreControlsSpecific('eles', 'normal');
 
-            speakText("Correu! Um ponto para o adversário.", true, () => {
+            speakText('correu', true, () => {
                 // Aqui removemos o 'ignoreMaoDeOnzeCheck' para false.
                 // Como essa equipe correu, a rodada acabou, e a equipe A continuará com 11!
                 // Então o changeScore de 1 ponto pro inimigo vai fazer o fluxo analisar a pontuação de novo e armar Mão de 11 de novo na próxima rodada automaticamente!
@@ -830,8 +1003,14 @@ function initializeApp() {
     nextDealerButtonElement = document.getElementById('next-dealer-btn');
     // scoreControlsContainer é definido na primeira chamada de toggleScoreControls
 
+    // Pré-carrega todos os MP3 estáticos na memória
+    preloadStaticAudio();
+
     loadGameSettings(); setTheme(currentTheme); setSound(isSoundOn);
     loadGameData();
+
+    // Pré-carrega áudios dos nomes já salvos
+    preloadPlayerNameAudios();
     updateUIBasedOnMode();
     updateMainTitle(); updateFooterCredit(); updateCurrentGameDisplay();
     updateMatchWinsDisplay();
