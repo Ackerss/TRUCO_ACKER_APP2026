@@ -60,16 +60,11 @@ export default {
 
         try {
             const secToken = await generateSecMsGecToken();
-            const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${secToken}&Sec-MS-GEC-Version=1-${CHROMIUM_FULL_VERSION}`;
 
-            // Cloudflare Workers suportam WebSocket fetch
-            const wsResp = await fetch(wsUrl, {
+            // Cloudflare Workers: usar https:// com header Upgrade ao invés de wss://
+            const wsResp = await fetch(`https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${secToken}&Sec-MS-GEC-Version=1-${CHROMIUM_FULL_VERSION}`, {
                 headers: {
                     'Upgrade': 'websocket',
-                    'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-                    'User-Agent': `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROMIUM_FULL_VERSION.split('.')[0]}.0.0.0 Safari/537.36 Edg/${CHROMIUM_FULL_VERSION.split('.')[0]}.0.0.0`,
-                    'Pragma': 'no-cache',
-                    'Cache-Control': 'no-cache',
                 }
             });
 

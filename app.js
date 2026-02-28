@@ -280,7 +280,7 @@ function preloadStaticAudio() {
 // O Worker faz a conexão WebSocket server-side com a API Microsoft Edge TTS
 // (mesmo protocolo do node-edge-tts) e retorna o MP3 com voz Francisca.
 // CONFIGURE SUA URL ABAIXO após fazer deploy do Worker!
-const TTS_WORKER_URL = ''; // Ex: 'https://truco-tts.seu-user.workers.dev'
+const TTS_WORKER_URL = 'https://small-boat-7942truco-tts.jacsonsax.workers.dev';
 
 // Gera áudio dinâmico para um nome via Cloudflare Worker
 async function generateDynamicNameAudio(name) {
