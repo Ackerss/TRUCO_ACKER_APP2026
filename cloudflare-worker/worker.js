@@ -65,6 +65,8 @@ export default {
             const wsResp = await fetch(`https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${secToken}&Sec-MS-GEC-Version=1-${CHROMIUM_FULL_VERSION}`, {
                 headers: {
                     'Upgrade': 'websocket',
+                    'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
                 }
             });
 
