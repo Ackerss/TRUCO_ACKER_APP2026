@@ -736,6 +736,22 @@ function exportHistoryToWhatsApp() {
 
 // --- Event Listeners ---
 function addEventListeners() {
+    // Controle do Modal de Regras
+    const rulesToggleBtn = document.getElementById('rules-toggle-btn');
+    const rulesModal = document.getElementById('rulesModal');
+    const closeRulesBtn = document.getElementById('closeRulesBtn');
+    const closeRulesBtnBottom = document.getElementById('closeRulesBtnBottom');
+
+    function openRules() { rulesModal.classList.remove('hidden'); }
+    function closeRules() { rulesModal.classList.add('hidden'); }
+
+    rulesToggleBtn?.addEventListener('click', openRules);
+    closeRulesBtn?.addEventListener('click', closeRules);
+    closeRulesBtnBottom?.addEventListener('click', closeRules);
+    rulesModal?.addEventListener('click', (e) => {
+        if (e.target === rulesModal) closeRules();
+    });
+
     document.querySelector('.teams').addEventListener('click', e => {
         const btn = e.target.closest('button');
         if (btn?.dataset.team && btn.dataset.amount) changeScore(btn.dataset.team, parseInt(btn.dataset.amount), btn.dataset.speak);

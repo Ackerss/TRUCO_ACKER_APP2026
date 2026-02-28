@@ -36,6 +36,7 @@
 
         <div class="timer-section">
             <div class="top-config-buttons">
+                <button id="rules-toggle-btn" title="Ver Regras do Jogo">❓</button>
                 <button id="theme-toggle-btn" title="Alternar Tema">☀️</button>
                 <button id="sound-toggle-btn" title="Alternar Som">🔊</button>
             </div>
@@ -139,6 +140,120 @@
         </div>
     </div>
 
+    <!-- Modal de Regras -->
+    <div id="rulesModal" class="modal-overlay hidden" aria-hidden="true">
+        <div class="modal-content">
+            <button id="closeRulesBtn" class="close-modal-btn" aria-label="Fechar Regras"><i
+                    class="fas fa-times"></i></button>
+            <div class="rules-scroll-area">
+                <h2>Regras do Truco (Baralho Espanhol - SC)</h2>
+                <p>Bem-vindo ao Truco! Aqui estão as regras básicas para você aprender a jogar, baseadas no estilo
+                    jogado em Santa Catarina com baralho espanhol (40 cartas, sem 8, 9, 10 e curingas).</p>
+
+                <h3>1. O Objetivo</h3>
+                <p>O objetivo do jogo é ser a primeira equipe (ou jogador) a alcançar <strong>12 pontos</strong>.</p>
+
+                <h3>2. O Baralho e as Manilhas</h3>
+                <p>Joga-se com o baralho espanhol limpo. A ordem de força das cartas (da mais forte para a mais fraca) é
+                    fixa, mas as <strong>Manilhas</strong> (as 4 cartas mais fortes do jogo) mudam a cada rodada,
+                    dependendo do "Vira" (a carta que é virada na mesa após a distribuição).</p>
+
+                <p>As Manilhas são sempre as cartas <strong>imediatamente acima do Vira</strong>.</p>
+                <p class="highlight-box"><strong>Exemplo:</strong> Se o Vira for um 5, as Manilhas serão os 6. Se o Vira
+                    for um 7, as Manilhas serão os 10 (Valetes), pois o 8 e o 9 não jogam neste baralho. Se o Vira é um
+                    12, as Manilhas serão o 1, que é considerado a carta mais forte após o 12.</p>
+
+                <h4>Desempate de Manilhas e Naipes</h4>
+                <p>As manilhas têm força diferente baseada no seu Naipe (símbolo). Por isso, <strong>Manilhas nunca
+                        "empacham" (empatam)!</strong> Se dois jogadores jogarem uma manilha, a de naipe mais forte
+                    sempre vence.</p>
+
+                <div class="order-box">
+                    <p><strong>Ordem das Manilhas (da mais forte para a mais fraca):</strong></p>
+                    <ol>
+                        <li><strong>Zap</strong> (Paus)</li>
+                        <li><strong>Copas</strong> (Copas)</li>
+                        <li><strong>Espadilha</strong> (Espadas)</li>
+                        <li><strong>Ouros</strong> (Ouros)</li>
+                    </ol>
+                </div>
+
+                <p><strong>Ordem das Cartas Normais (abaixo das Manilhas):</strong><br>
+                    3 > 2 > 1 (Ás) > 12 (Rei) > 11 (Cavalo) > 10 (Valete) > 7 > 6 > 5 > 4</p>
+
+                <h3>3. Como Jogar (A Mão)</h3>
+                <ul>
+                    <li>Cada jogador recebe 3 cartas.</li>
+                    <li>A "Mão" (rodada) é dividida em até 3 "Tombos" (jogadas).</li>
+                    <li>Após embaralhar as cartas, passa-se o monte para o jogador da Esquerda fazer um corte simples no
+                        baralho. O jogador que cortou pega uma carta (quando em equipe, ele olha esta carta cortada,
+                        passa para o jogador da sua equipe e devolve o monte para quem embaralhou).</li>
+                    <li>O jogador à direita de quem embaralhou começa jogando uma carta. O maior valor de carta ganha a
+                        jogada (o "Tombo").</li>
+                    <li>A equipe que ganhar <strong>2 dos 3 Tombos</strong> vence a Mão e ganha <strong>1 ponto</strong>
+                        no placar.</li>
+                </ul>
+
+                <h4>O Empate ou "Empachada"</h4>
+                <p>Quando duas cartas normais de mesmo valor (que não sejam manilhas) são jogadas como as maiores da
+                    mesa por adversários, a jogada <strong>"empacha" (empata)</strong> e vai valer quem ganhar o próximo
+                    "Tombo" (jogada)!</p>
+                <ul>
+                    <li><strong>Empachou o 1º Tombo:</strong> Ninguém ganhou ainda. A próxima jogada decidirá a mão.
+                        Quem ganhar o 2º Tombo vence a Mão inteira.</li>
+                    <li><strong>Empachou o 2º ou 3º Tombo:</strong> A equipe que ganhou o 1º Tombo tem vantagem e já
+                        vence a mão toda.</li>
+                    <li><strong>Empatou os 3 Tombos:</strong> Ninguém ganha ponto, a Mão é anulada e o baralho roda para
+                        o próximo.</li>
+                </ul>
+
+                <h3>4. O Truco</h3>
+                <p>Qualquer jogador, na sua vez, pode pedir <strong>"Truco!"</strong>. Isso é um desafio que aumenta o
+                    valor da mão de 1 ponto para 3 pontos. A equipe adversária pode:</p>
+                <ul>
+                    <li><strong>Aceitar:</strong> A mão passa a valer 3 pontos.</li>
+                    <li><strong>Correr:</strong> A equipe que pediu o Truco ganha 1 ponto e a mão acaba na hora.</li>
+                    <li><strong>Pedir Seis:</strong> Aumenta a aposta para 6 pontos (a vez de resposta volta para a
+                        equipe que pediu Truco inicialmente). Os aumentos possíveis são: Truco (3) > Seis (6) > Nove (9)
+                        > Doze (12).</li>
+                </ul>
+
+                <div class="warning-box">
+                    <strong>Atenção: Truco Empachado</strong><br>
+                    Se você pedir Truco, a outra equipe Aceitar, e logo em seguida a sua carta empachar com a do
+                    adversário, a sua equipe <strong>perde a rodada e os 3 pontos automaticamente!</strong> Quem pede
+                    Truco tem a obrigação de "matar" (jogar uma carta estritamente maior). <em>(Lembrando que manilha
+                        nunca empacha, vence a manilha com maior naipe).</em>
+                </div>
+
+                <h3>5. Mão de 11</h3>
+                <p>Quando uma equipe chega a exatos 11 pontos, ela joga a "Mão de 11". Todas as equipes podem olhar as
+                    cartas de seus parceiros (se jogar em dupla) mas <strong>somente quem está com 11 pontos</strong>
+                    irá decidir se quer jogar a rodada:</p>
+                <ul>
+                    <li><strong>Equipe com 11 pontos Aceitar a rodada:</strong> A mão automaticamente passa a valer 3
+                        pontos. <em>Obs: Ninguém pode pedir Truco!</em></li>
+                    <li><strong>Correr:</strong> A equipe adversária ganha 1 ponto sem ninguém jogar as cartas.</li>
+                </ul>
+
+                <h3>6. Empate em 11 a 11 (Escurinha ou Escurona)</h3>
+                <p>Quando a partida empata em 11 a 11, ninguém mais pode pedir Truco. A decisão e modalidade devem ser
+                    combinadas entre os jogadores:</p>
+                <ul>
+                    <li><strong>Escurinha (Para Equipes):</strong> Apenas o jogador da vez pode olhar as suas próprias
+                        cartas! Ele não pode mostrar nem falar qual carta tem para os parceiros (evitando sinais). O
+                        primeiro joga, o segundo olha e joga, e assim por diante.</li>
+                    <li><strong>Escurona (No Escuro Total):</strong> Ninguém olha as suas cartas em momento nenhum! Os
+                        jogadores escolhem uma carta na sorte, no escuro, e "chutam". A equipe que vencer o tombo de
+                        pura sorte, ganha a mão, e no final das 3 rodadas é avaliado o jogo todo para ver quem levou o
+                        jogo!</li>
+                </ul>
+            </div>
+            <button id="closeRulesBtnBottom" class="close-rules-bottom">Entendido!</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
     <script src="app.js"></script>
 </body>
 
