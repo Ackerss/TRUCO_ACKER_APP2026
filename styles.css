@@ -507,6 +507,69 @@ hr {
     background-color: var(--button-truco-active);
 }
 
+/* --- Decisão Mão de 11 --- */
+.decisao-onze {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 12px;
+    margin-top: 5px;
+}
+
+.decisao-onze p {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: var(--button-change-mode-border);
+    margin: 0 0 5px 0;
+    text-shadow: 0 0 5px rgba(245, 158, 11, 0.3);
+}
+
+.decisao-onze button {
+    width: 100%;
+    max-width: 140px;
+    padding: 12px 10px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.05em;
+    cursor: pointer;
+    border-style: solid;
+    border-width: 1px;
+    border-bottom-width: 3px;
+    transition: transform 0.1s, background-color 0.2s;
+    box-shadow: 0 4px 10px var(--shadow-color-darker);
+}
+
+.decisao-onze button:active {
+    transform: translateY(1px);
+    border-bottom-width: 2px;
+}
+
+.btn-aceitar {
+    background-color: rgba(250, 204, 21, 0.85);
+    color: #000;
+    border-color: rgba(234, 179, 8, 1);
+    border-bottom-color: rgba(161, 98, 7, 1);
+}
+
+.btn-aceitar:hover {
+    background-color: rgba(250, 204, 21, 1);
+}
+
+.btn-recusar {
+    background-color: rgba(244, 63, 94, 0.85);
+    color: #fff;
+    border-color: rgba(225, 29, 72, 1);
+    border-bottom-color: rgba(159, 18, 57, 1);
+}
+
+.btn-recusar:hover {
+    background-color: rgba(244, 63, 94, 1);
+}
+
 
 /* --- Botão Desfazer --- */
 .undo-section {

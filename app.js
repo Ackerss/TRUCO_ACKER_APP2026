@@ -215,10 +215,8 @@ function updateSoundButtonIcon() {
 }
 
 function toggleScoreControls(enable) {
-    if (!scoreControlsContainer || scoreControlsContainer.length === 0) {
-        scoreControlsContainer = document.querySelectorAll('.controls button');
-    }
-    scoreControlsContainer.forEach(button => {
+    const allButtons = document.querySelectorAll('.controls button');
+    allButtons.forEach(button => {
         button.disabled = !enable;
     });
 }
@@ -369,10 +367,8 @@ function advanceDealer(speakAnnounce = false, callback = null) {
 }
 
 // --- Lógica Principal de Pontuação ---
-function changeScore(team, amount, speakPointText = null) {
+function changeScore(team, amount, speakPointText = null, ignoreMaoDeOnzeCheck = false) {
     if (isGameEffectivelyOver) {
-        // A fala e o reinício automático são tratados em processMatchEnd
-        // speakText("A partida terminou. Uma nova partida será iniciada em breve.", true); // Removido para evitar fala duplicada
         return false;
     }
 
@@ -425,6 +421,9 @@ function changeScore(team, amount, speakPointText = null) {
                 processMatchEnd(winner);
             } else {
                 saveGameState();
+                if (!ignoreMaoDeOnzeCheck) {
+                    checkMaoDeOnzeState();
+                }
             }
         };
         if (amount > 0) {
@@ -438,18 +437,73 @@ function changeScore(team, amount, speakPointText = null) {
 
     if (speakPointText && amount !== 0) {
         let fullSpeakText = speakPointText;
-        let targetName;
-        if (team === 'nos') {
-            targetName = gameMode === 4 ? teamNameNos : (playerNames[0] || "Jogador 1");
-        } else {
-            targetName = gameMode === 4 ? teamNameEles : (playerNames[1] || "Jogador 2");
-        }
+        let targetName = getTeamDisplayName(team);
         fullSpeakText += ` para ${targetName}`;
         speakText(fullSpeakText, true, afterPointSpeechAction);
     } else {
         afterPointSpeechAction();
     }
     return true;
+}
+
+// Helper: Pega o nome da equipe/jogador pro modo atual
+function getTeamDisplayName(team) {
+    if (team === 'nos') {
+        return gameMode === 4 ? teamNameNos : (playerNames[0] || "Jogador 1");
+    } else {
+        return gameMode === 4 ? teamNameEles : (playerNames[1] || "Jogador 2");
+    }
+}
+
+// --- Regra Mão de 11 e Escurinha ---
+function checkMaoDeOnzeState() {
+    const isNosOnze = scoreNos === 11;
+    const isElesOnze = scoreEles === 11;
+
+    // Reseta visibilidade dos paineis primeiro
+    document.getElementById('decisao-nos')?.classList.add('hidden');
+    document.getElementById('decisao-eles')?.classList.add('hidden');
+    toggleScoreControlsSpecific('nos', true, false);
+    toggleScoreControlsSpecific('eles', true, false);
+
+    if (isNosOnze && isElesOnze) {
+        // Escurinha (11 a 11)
+        speakText("Escurinha! Jogo no escuro, não vale pedir truco.");
+        toggleScoreControlsSpecific('nos', true, true); // Trava botões de truco
+        toggleScoreControlsSpecific('eles', true, true); // Trava botões de truco
+    } else if (isNosOnze) {
+        // Mão de 11 para Nós
+        let teamName = getTeamDisplayName('nos');
+        speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar ou correr.`);
+        toggleScoreControlsSpecific('nos', false); // Oculta controles normais
+        document.getElementById('decisao-nos')?.classList.remove('hidden'); // Mostra dor
+        toggleScoreControlsSpecific('eles', true, true); // Eles não trucam
+    } else if (isElesOnze) {
+        // Mão de 11 para Eles
+        let teamName = getTeamDisplayName('eles');
+        speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar ou correr.`);
+        toggleScoreControlsSpecific('eles', false);
+        document.getElementById('decisao-eles')?.classList.remove('hidden');
+        toggleScoreControlsSpecific('nos', true, true);
+    }
+}
+
+// Ativa/Trava botoes específicos de uma equipe (parametro 'trucoOnly' trava os acima de +1)
+function toggleScoreControlsSpecific(team, enable, trucoOnly = false) {
+    const controls = document.querySelectorAll(`.team .controls button[data-team="${team}"]`);
+    controls.forEach(btn => {
+        let amt = parseInt(btn.dataset.amount);
+        if (!enable) {
+            btn.classList.add('hidden');
+        } else {
+            btn.classList.remove('hidden');
+            if (trucoOnly && (amt >= 3 || amt === -1)) {
+                btn.disabled = true;
+            } else {
+                btn.disabled = false;
+            }
+        }
+    });
 }
 
 // --- Funcionalidade Desfazer ---
@@ -476,6 +530,10 @@ function undoLastAction() {
             resetCurrentTimerDisplay();
         }
         updateCurrentGameDisplay(); updateDealerDisplay(); updateScoreSectionTitles(); saveGameState();
+
+        // Se voltou para algo que envolvia mão de 11.
+        checkMaoDeOnzeState();
+
         undoState = null; if (undoButton) undoButton.disabled = true;
         speakText("Ação desfeita.", true);
     } else {
@@ -642,6 +700,26 @@ function addEventListeners() {
     document.querySelector('.teams').addEventListener('click', e => {
         const btn = e.target.closest('button');
         if (btn?.dataset.team && btn.dataset.amount) changeScore(btn.dataset.team, parseInt(btn.dataset.amount), btn.dataset.speak);
+        // Botões Novod da Mao de 11
+        if (btn?.classList.contains('btn-aceitar')) {
+            const teamInfo = btn.dataset.team;
+            document.getElementById(`decisao-${teamInfo}`).classList.add('hidden');
+            toggleScoreControlsSpecific(teamInfo, true, true); // Volta os controles (sem truco pois já vale 3)
+            speakText("Jogo aceito! Valendo 3 pontos!");
+        }
+        if (btn?.classList.contains('btn-recusar')) {
+            const teamInfo = btn.dataset.team;
+            const inimigo = teamInfo === 'nos' ? 'eles' : 'nos';
+            document.getElementById(`decisao-${teamInfo}`).classList.add('hidden');
+            toggleScoreControlsSpecific(teamInfo, true, false);
+            speakText("Correu! Um ponto para o adversário.", true, () => {
+                // Ignore mão de 11 loop adicionando o bool no changeScore
+                changeScore(inimigo, 1, null, true);
+                // Restaura os botões de todos p normal na próxima mão
+                toggleScoreControlsSpecific('nos', true, false);
+                toggleScoreControlsSpecific('eles', true, false);
+            });
+        }
     });
     themeToggleButton?.addEventListener('click', toggleTheme);
     soundToggleButton?.addEventListener('click', toggleSound);
@@ -713,6 +791,11 @@ function initializeApp() {
             currentTimerElement.textContent = formatTime(elapsed);
             startTimer();
         }
+    }
+
+    // Check if re-opening game triggers a Mao de 11 scenario visually
+    if (!isInitialState && !isGameEffectivelyOver) {
+        checkMaoDeOnzeState();
     }
 }
 document.addEventListener('DOMContentLoaded', initializeApp);
