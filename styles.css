@@ -184,8 +184,8 @@ h1 {
     margin-top: 5px;
     margin-bottom: 20px;
     font-size: 1.8em;
-    font-weight: 600;
-    text-shadow: 0 1px 2px var(--shadow-color-darkest);
+    font-weight: 700;
+    text-shadow: 0 1px 1px var(--shadow-color-darker), 0 3px 4px var(--shadow-color-darkest), 0 5px 8px rgba(0, 0, 0, 0.5);
     position: relative;
 }
 
@@ -254,6 +254,7 @@ hr {
     z-index: 10;
 }
 
+#rules-toggle-btn,
 #theme-toggle-btn,
 #sound-toggle-btn {
     background: var(--button-bg);
@@ -269,14 +270,16 @@ hr {
     align-items: center;
     padding: 0;
     transition: background-color 0.2s, color 0.2s, transform 0.15s;
-    box-shadow: 0 1px 2px var(--shadow-color);
+    box-shadow: 0 3px 5px var(--shadow-color-darker), inset 0 1px 1px rgba(255, 255, 255, 0.1);
 }
 
+#rules-toggle-btn:hover,
 #theme-toggle-btn:hover,
 #sound-toggle-btn:hover {
     background-color: var(--button-hover-bg);
 }
 
+#rules-toggle-btn:active,
 #theme-toggle-btn:active,
 #sound-toggle-btn:active {
     transform: translateY(-50%) scale(0.92);
@@ -401,6 +404,13 @@ hr {
     color: var(--text-color-light);
     font-size: 1.25em;
     font-weight: 600;
+    min-height: 2.5em;
+    /* Garante que 1 ou 2 linhas ocupem o mesmo espaço vertical */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
 }
 
 .score {
@@ -1110,8 +1120,10 @@ hr {
 
 .team-custom-input {
     display: flex;
+    flex-direction: column;
     gap: 8px;
-    align-items: center;
+    align-items: stretch;
+    margin-top: 10px;
 }
 
 .team-custom-input input {
