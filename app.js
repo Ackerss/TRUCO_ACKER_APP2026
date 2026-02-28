@@ -463,47 +463,73 @@ function checkMaoDeOnzeState() {
     // Reseta visibilidade dos paineis primeiro
     document.getElementById('decisao-nos')?.classList.add('hidden');
     document.getElementById('decisao-eles')?.classList.add('hidden');
-    toggleScoreControlsSpecific('nos', true, false);
-    toggleScoreControlsSpecific('eles', true, false);
+    toggleScoreControlsSpecific('nos', 'normal');
+    toggleScoreControlsSpecific('eles', 'normal');
 
     if (isNosOnze && isElesOnze) {
         // Escurinha (11 a 11)
         speakText("Escurinha! Jogo no escuro, não vale pedir truco.");
-        toggleScoreControlsSpecific('nos', true, true); // Trava botões de truco
-        toggleScoreControlsSpecific('eles', true, true); // Trava botões de truco
+        toggleScoreControlsSpecific('nos', 'escurinha');
+        toggleScoreControlsSpecific('eles', 'escurinha');
     } else if (isNosOnze) {
         // Mão de 11 para Nós
         let teamName = getTeamDisplayName('nos');
         speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar ou correr.`);
-        toggleScoreControlsSpecific('nos', false); // Oculta controles normais
+        toggleScoreControlsSpecific('nos', 'none'); // Oculta controles normais
         document.getElementById('decisao-nos')?.classList.remove('hidden'); // Mostra dor
-        toggleScoreControlsSpecific('eles', true, true); // Eles não trucam
+        toggleScoreControlsSpecific('eles', 'none'); // Oculta controles do adversario também pra ngm pontuar sem querer
     } else if (isElesOnze) {
         // Mão de 11 para Eles
         let teamName = getTeamDisplayName('eles');
         speakText(`Mão de 11 para a equipe ${teamName}! Podem olhar ou correr.`);
-        toggleScoreControlsSpecific('eles', false);
+        toggleScoreControlsSpecific('eles', 'none');
         document.getElementById('decisao-eles')?.classList.remove('hidden');
-        toggleScoreControlsSpecific('nos', true, true);
+        toggleScoreControlsSpecific('nos', 'none');
     }
 }
 
-// Ativa/Trava botoes específicos de uma equipe (parametro 'trucoOnly' trava os acima de +1)
-function toggleScoreControlsSpecific(team, enable, trucoOnly = false) {
+// Ativa/Trava botoes específicos de uma equipe
+// mode: 'normal', 'none' (hiddden), 'escurinha' (apenas +1 e -1 permiitido), 'aceitou11' (apenas +3 permitido)
+function toggleScoreControlsSpecific(team, mode) {
     const controls = document.querySelectorAll(`.team .controls button[data-team="${team}"]`);
     controls.forEach(btn => {
         let amt = parseInt(btn.dataset.amount);
-        if (!enable) {
+
+        if (mode === 'none') {
             btn.classList.add('hidden');
         } else {
             btn.classList.remove('hidden');
-            if (trucoOnly && (amt >= 3 || amt === -1)) {
-                btn.disabled = true;
-            } else {
+
+            if (mode === 'escurinha') {
+                // Na escurinha, ninguém pode pedir truco (+3, +6, +9, +12)
+                if (amt >= 3 || amt === -1) {
+                    btn.disabled = true;
+                    if (amt >= 3) btn.classList.add('hidden'); // Oculta pra ficar limpo
+                } else {
+                    btn.disabled = false;
+                }
+            }
+            else if (mode === 'aceitou11') {
+                // Se aceitou a mão de 11, o jogo OBRIGATORIAMENTE vale 3 pontos.
+                // Esconde todos os botões exceto o +3 para facilitar.
+                if (amt !== 3) {
+                    btn.classList.add('hidden');
+                    btn.disabled = true;
+                } else {
+                    btn.disabled = false;
+                    btn.classList.remove('hidden');
+                }
+            }
+            else { // 'normal'
                 btn.disabled = false;
             }
         }
     });
+
+    // Restaurar layout se o botão +1 voltar (caso tenha sido escondido antes)
+    if (mode === 'normal') {
+        controls.forEach(btn => { btn.classList.remove('hidden'); btn.disabled = false; });
+    }
 }
 
 // --- Funcionalidade Desfazer ---
@@ -704,20 +730,27 @@ function addEventListeners() {
         if (btn?.classList.contains('btn-aceitar')) {
             const teamInfo = btn.dataset.team;
             document.getElementById(`decisao-${teamInfo}`).classList.add('hidden');
-            toggleScoreControlsSpecific(teamInfo, true, true); // Volta os controles (sem truco pois já vale 3)
+
+            // Se aceitou, libera APENAS o botão de +3 pontos p/ AMBAS equipes!
+            toggleScoreControlsSpecific('nos', 'aceitou11');
+            toggleScoreControlsSpecific('eles', 'aceitou11');
+
             speakText("Jogo aceito! Valendo 3 pontos!");
         }
         if (btn?.classList.contains('btn-recusar')) {
             const teamInfo = btn.dataset.team;
             const inimigo = teamInfo === 'nos' ? 'eles' : 'nos';
             document.getElementById(`decisao-${teamInfo}`).classList.add('hidden');
-            toggleScoreControlsSpecific(teamInfo, true, false);
+
+            // Restaura os botões de todos p normal na próxima mão temporariamente pro toggle ficar certo
+            toggleScoreControlsSpecific('nos', 'normal');
+            toggleScoreControlsSpecific('eles', 'normal');
+
             speakText("Correu! Um ponto para o adversário.", true, () => {
-                // Ignore mão de 11 loop adicionando o bool no changeScore
-                changeScore(inimigo, 1, null, true);
-                // Restaura os botões de todos p normal na próxima mão
-                toggleScoreControlsSpecific('nos', true, false);
-                toggleScoreControlsSpecific('eles', true, false);
+                // Aqui removemos o 'ignoreMaoDeOnzeCheck' para false.
+                // Como essa equipe correu, a rodada acabou, e a equipe A continuará com 11!
+                // Então o changeScore de 1 ponto pro inimigo vai fazer o fluxo analisar a pontuação de novo e armar Mão de 11 de novo na próxima rodada automaticamente!
+                changeScore(inimigo, 1, null, false);
             });
         }
     });
